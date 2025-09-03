@@ -141,103 +141,107 @@ def required_lumpsum_for_goal(ending_values: list, goal_amount: float, conf: flo
 # ------------------------------
 # Run
 # ------------------------------
-if df is not None and allocation_cols:
-    rows = []
-    for col in allocation_cols:
-        evs = simulate_ending_values_lumpsum(df[col], int(num_years), int(row_increment))
-        if not evs:
-            req = np.nan
-            note = "No valid windows (NaNs or insufficient length)"
-        else:
-            req = required_lumpsum_for_goal(evs, float(goal), float(confidence_level))
-            note = ""
-        rows.append({
-            "Allocation": col.strip(),
-            "Required Lump Sum": np.nan if pd.isna(req) else float(req),
-            "Valid Windows": len(evs),
-            "Note": note,
-        })
-    results = pd.DataFrame(rows)
-    # Preserve original worksheet header as Portfolio Name before mapping to pretty labels
-    results["Portfolio Name"] = results["Allocation"]
-
-    # Order & pretty labels
-    order = [
-        'LBM 100E','LBM 90E','LBM 80E','LBM 70E','LBM 60E',
-        'LBM 50E','LBM 40E','LBM 30E','LBM 20E','LBM 10E','LBM 100F'
-    ]
-    pretty = {
-        'LBM 100E': '100% Equity','LBM 90E': '90% Equity','LBM 80E': '80% Equity','LBM 70E': '70% Equity',
-        'LBM 60E': '60% Equity','LBM 50E': '50% Equity','LBM 40E': '40% Equity','LBM 30E': '30% Equity',
-        'LBM 20E': '20% Equity','LBM 10E': '10% Equity','LBM 100F': '100% Fixed'
-    }
-    results["_key"] = pd.Categorical(results["Allocation"], categories=order, ordered=True)
-    results = results.sort_values("_key").drop(columns=["_key"]).copy()
-    results["Allocation"] = results["Allocation"].map(pretty).fillna(results["Allocation"])  # fallback
-
-    # Prepare a copy for display with currency formatting
-    display_results = results.copy()
-    if "Required Lump Sum" in display_results.columns:
-        display_results["Required Lump Sum"] = display_results["Required Lump Sum"].apply(
-            lambda x: f"${x:,.0f}" if pd.notna(x) else ""
-        )
-
-    # Reorder columns for display to include the original Portfolio Name
-    desired_cols = ["Allocation", "Portfolio Name", "Required Lump Sum", "Valid Windows", "Note"]
-    display_results = display_results[[c for c in desired_cols if c in display_results.columns]]
-
-    st.subheader("Results")
-    st.write(display_results)
-
-    # Bar chart
-    plot_df = results.dropna(subset=["Required Lump Sum"]).copy()
-    if not plot_df.empty:
-        min_val = plot_df["Required Lump Sum"].min()
-        colors = ["green" if v == min_val else "blue" for v in plot_df["Required Lump Sum"]]
-        fig = go.Figure(data=[go.Bar(
-            x=plot_df['Allocation'],
-            y=plot_df['Required Lump Sum'],
-            marker_color=colors,
-            text=[f"${v:,.0f}" for v in plot_df['Required Lump Sum']],
-            textposition='outside'
-        )])
-        fig.update_layout(
-            title="Required Lump Sum by Allocation",
-            xaxis_title="Allocation",
-            yaxis_title="Required Lump Sum ($)",
-            uniformtext_minsize=8,
-            uniformtext_mode='hide',
-            yaxis=dict(tickformat=",.0f", tickprefix="$")
-        )
-        st.plotly_chart(fig, use_container_width=True)
-
-    # Download (CSV with raw numeric values)
-    csv = results.to_csv(index=False)
-    st.download_button("Download CSV", data=csv, file_name="required_lumpsum_by_allocation.csv", mime="text/csv")
-
-    st.divider()
-    st.subheader("Disclosures")
-    # Try common locations for the disclosures PDF
-    pdf_candidates = [
-        "DataSource LBM Portfolios.pdf",
-        os.path.join("..", "DataSource LBM Portfolios.pdf"),
-        "disclosures.pdf",  # fallback name
-    ]
-    pdf_path = next((p for p in pdf_candidates if os.path.exists(p)), None)
-
-    if pdf_path:
-        with open(pdf_path, "rb") as f:
-            pdf_bytes = f.read()
-        file_label = os.path.basename(pdf_path)
-        # Force download only (no in-browser open/link)
-        st.download_button(
-            "Download Disclosures (PDF)",
-            data=pdf_bytes,
-            file_name=file_label,
-            mime="application/pdf",
-        )
+if st.button("Compute required lump sum"):
+    if df is None or not allocation_cols:
+        st.error("Load a worksheet with allocation columns first.")
     else:
-        st.info("Add `DataSource LBM Portfolios.pdf` to this app folder (or parent) to enable the download.")
+        rows = []
+        for col in allocation_cols:
+            evs = simulate_ending_values_lumpsum(df[col], int(num_years), int(row_increment))
+            if not evs:
+                req = np.nan
+                note = "No valid windows (NaNs or insufficient length)"
+            else:
+                req = required_lumpsum_for_goal(evs, float(goal), float(confidence_level))
+                note = ""
+            rows.append({
+                "Allocation": col.strip(),
+                "Required Lump Sum": np.nan if pd.isna(req) else float(req),
+                "Valid Windows": len(evs),
+                "Note": note,
+            })
+        results = pd.DataFrame(rows)
+        # Preserve original worksheet header as Portfolio Name before mapping to pretty labels
+        results["Portfolio Name"] = results["Allocation"]
+
+        # Order & pretty labels
+        order = [
+            'LBM 100E','LBM 90E','LBM 80E','LBM 70E','LBM 60E',
+            'LBM 50E','LBM 40E','LBM 30E','LBM 20E','LBM 10E','LBM 100F'
+        ]
+        pretty = {
+            'LBM 100E': '100% Equity','LBM 90E': '90% Equity','LBM 80E': '80% Equity','LBM 70E': '70% Equity',
+            'LBM 60E': '60% Equity','LBM 50E': '50% Equity','LBM 40E': '40% Equity','LBM 30E': '30% Equity',
+            'LBM 20E': '20% Equity','LBM 10E': '10% Equity','LBM 100F': '100% Fixed'
+        }
+        results["_key"] = pd.Categorical(results["Allocation"], categories=order, ordered=True)
+        results = results.sort_values("_key").drop(columns=["_key"]).copy()
+        results["Allocation"] = results["Allocation"].map(pretty).fillna(results["Allocation"])  # fallback
+
+        # Prepare a copy for display with currency formatting
+        display_results = results.copy()
+        if "Required Lump Sum" in display_results.columns:
+            display_results["Required Lump Sum"] = display_results["Required Lump Sum"].apply(
+                lambda x: f"${x:,.0f}" if pd.notna(x) else ""
+            )
+
+        # Reorder columns for display to include the original Portfolio Name
+        desired_cols = ["Allocation", "Portfolio Name", "Required Lump Sum", "Valid Windows", "Note"]
+        display_results = display_results[[c for c in desired_cols if c in display_results.columns]]
+
+        st.subheader("Results")
+        st.write(display_results)
+
+        # Bar chart
+        plot_df = results.dropna(subset=["Required Lump Sum"]).copy()
+        if not plot_df.empty:
+            min_val = plot_df["Required Lump Sum"].min()
+            colors = ["green" if v == min_val else "blue" for v in plot_df["Required Lump Sum"]]
+            fig = go.Figure(data=[go.Bar(
+                x=plot_df['Allocation'],
+                y=plot_df['Required Lump Sum'],
+                marker_color=colors,
+                text=[f"${v:,.0f}" for v in plot_df['Required Lump Sum']],
+                textposition='outside'
+            )])
+            fig.update_layout(
+                title="Required Lump Sum by Allocation",
+                xaxis_title="Allocation",
+                yaxis_title="Required Lump Sum ($)",
+                uniformtext_minsize=8,
+                uniformtext_mode='hide',
+                yaxis=dict(tickformat=",.0f", tickprefix="$")
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+        # Download (CSV with raw numeric values)
+        csv = results.to_csv(index=False)
+        st.download_button("Download CSV", data=csv, file_name="required_lumpsum_by_allocation.csv", mime="text/csv")
+
+        st.divider()
+        st.subheader("Disclosures")
+        # Try common locations for the disclosures PDF
+        pdf_candidates = [
+            "DataSource LBM Portfolios.pdf",
+            os.path.join("..", "DataSource LBM Portfolios.pdf"),
+            "disclosures.pdf",  # fallback name
+        ]
+        pdf_path = next((p for p in pdf_candidates if os.path.exists(p)), None)
+
+        if pdf_path:
+            with open(pdf_path, "rb") as f:
+                pdf_bytes = f.read()
+            file_label = os.path.basename(pdf_path)
+            # Force download only (no in-browser open/link)
+            st.download_button(
+                "Download Disclosures (PDF)",
+                data=pdf_bytes,
+                file_name=file_label,
+                mime="application/pdf",
+            )
+        else:
+            st.info("Add `DataSource LBM Portfolios.pdf` to this app folder (or parent) to enable the download.")
+
 
 
 # ------------------------------
