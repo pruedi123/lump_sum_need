@@ -199,32 +199,29 @@ if st.button("Compute required lump sum"):
         csv = results.to_csv(index=False)
         st.download_button("Download CSV", data=csv, file_name="required_lumpsum_by_allocation.csv", mime="text/csv")
 
+        st.write("Data Source: Dimensional Fund Advisors. See https://www.dimensional.com/us-en/ for details.")
+        st.write("Here’s a comprehensive disclosure you can use for your calculators. You can adjust language and formatting depending on whether it’s for a website, app, PDF, or client-facing presentation:
 
+⸻
 
+Important Disclosure & Disclaimer
 
+The investment and retirement calculators provided are for educational and informational purposes only. They are intended to help users better understand potential financial concepts, trade-offs, and the impact of different assumptions.
 
-# ------------------------------
-        
-st.write("Data Source: Dimensional Fund Advisors. See https://www.dimensional.com/us-en/ for details.")
+These tools:
+	•	Do not provide financial, investment, tax, or legal advice.
+	•	Do not constitute a recommendation to buy, sell, or hold any security, product, or strategy.
+	•	Do not guarantee or predict future performance. Past performance of the markets or any asset class is not a reliable indicator of future results.
 
-st.write("""
----
-**Disclosures**
+All projections, scenarios, and illustrations are hypothetical in nature. They rely on assumptions, historical data, and simplified models that may not reflect actual future outcomes. Actual results will vary, sometimes significantly, due to market fluctuations, inflation, taxes, fees, behavioral factors, and other uncertainties outside the scope of these calculators.
 
-This tool is for informational purposes only and does not constitute investment advice, a recommendation, or an offer to buy or sell any security. All calculations are based on historical annual factor returns provided by Dimensional Fund Advisors and do not guarantee future results. Actual investment returns may differ significantly from those shown.
+You should not rely solely on these tools to make financial decisions. Before making any investment or retirement planning decisions, you should carefully consider your personal circumstances and consult with a qualified financial advisor, tax professional, or attorney.
 
-**Important Notes:**
-- The required lump sum amounts are calculated using rolling historical return windows and assume all returns are reinvested with no withdrawals.
-- The confidence level represents the percentage of historical periods in which the lump sum would have reached or exceeded the stated goal. Past performance does not guarantee future results.
-- Taxes, fees, trading costs, and other real-world frictions are not included in these calculations.
-- Allocations labeled as "Equity" and "Fixed" are based on the composition of the underlying factor data as defined by Dimensional Fund Advisors.
+By using these calculators, you acknowledge and agree that:
+	•	You are solely responsible for any decisions made based on the information provided.
+	•	Neither the creator(s) of these tools nor any associated parties shall be liable for any loss or damages resulting from reliance on the outputs.
 
----
-""")
+⸻
 
-
-
-
-
-# ------------------------------
+⚠️ Bottom line: These calculators are designed to help you learn, not to serve as personalized financial advice or a promise of future outcomes.
 

@@ -199,13 +199,12 @@ if st.button("Compute required lump sum"):
         csv = results.to_csv(index=False)
         st.download_button("Download CSV", data=csv, file_name="required_lumpsum_by_allocation.csv", mime="text/csv")
 
-
+        st.write("Data Source: Dimensional Fund Advisors. See https://www.dimensional.com/us-en/ for details.")
+        st.write("")
 
 
 
 # ------------------------------
-        
-st.write("Data Source: Dimensional Fund Advisors. See https://www.dimensional.com/us-en/ for details.")
 
 st.write("""
 ---
