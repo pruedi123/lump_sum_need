@@ -2,7 +2,6 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 import os
-from textwrap import dedent
 
 # Try to import plotly with a clear, actionable error if missing
 try:
@@ -287,52 +286,27 @@ if have_any:
     display_results = display_results[cols]
 
     with st.expander("Why compare Global vs. S&P 500?"):
-        st.markdown(dedent(
+        st.markdown(
             """
-            **The simple story:** You’ll often hear “just buy the S&P 500.” It’s low-cost and has done well—especially recently.
-            But the S&P 500 is only U.S. large companies. A **global** portfolio owns thousands of companies across many countries and sectors.
+**The simple story:** You’ll often hear “just buy the S&P 500.” It’s low-cost and has done well—especially recently.
+But the S&P 500 is only U.S. large companies. A **global** portfolio owns thousands of companies across many countries and sectors.
 
-            **What this tool does:** It is an **historical audit**—not a prediction. For each allocation, it uses real, rolling periods
-            to answer: *“How much would I have needed to invest up front to reach my goal?”*  
-            Small annual return differences can compound into **big** gaps over 20–30 years, which this makes easy to see.
+**What this tool does:** It is an **historical audit**—not a prediction. For each allocation, it uses real, rolling periods
+to answer: *“How much would I have needed to invest up front to reach my goal?”*  
+Small annual return differences can compound into **big** gaps over 20–30 years, which this makes easy to see.
 
-            **How to read the results:**
-            - **Allocation**: The stock/bond mix (e.g., 60% Equity).
-            - **Global vs. SP500**: The up-front amount needed in each portfolio to target your goal based on historical windows.
-            - **Confidence**: 100% = worst historical window; 95% = still conservative but less extreme.
-            - **Fees**: You can include an annual fee to see the impact.
+**How to read the results:**
+- **Allocation**: The stock/bond mix (e.g., 60% Equity).
+- **Global vs. SP500**: The up-front amount needed in each portfolio to target your goal based on historical windows.
+- **Confidence**: 100% = worst historical window; 95% = still conservative but less extreme.
+- **Fees**: You can include an annual fee to see the impact.
 
-            **Bottom line:** The S&P 500 has led lately, but leadership rotates. A **global** approach spreads your bets and has often delivered
-            competitive—or better—long-term outcomes without relying on a single country or sector.
+**Bottom line:** The S&P 500 has led lately, but leadership rotates. A **global** approach spreads your bets and has often delivered
+competitive—or better—long-term outcomes without relying on a single country or sector.
 
-            *Educational use only. Past performance does not guarantee future results.*
+*Educational use only. Past performance does not guarantee future results.*
             """
-        ))
-    with st.expander("Why can the dollar difference be so large over long horizons?"):
-        st.markdown(dedent(
-            """
-            **Short answer:** compounding + using the **worst historical window** at 100% confidence.
-
-            - **Small annual gaps snowball.** A 3% per year difference over 25 years roughly doubles the ending value.
-            - **Required lump sum is inverse growth.** If Portfolio A grows ~2× more over the horizon, you need about **half** the up‑front amount.
-
-            **Quick example (illustrative):**
-            - Over 25 years, 5%/yr grows \$1 to about **\$3.4**; 2%/yr grows \$1 to about **\$1.6**.
-            - To reach a \$1,000,000 goal:
-              - With a 5% worst window: need ~\$1,000,000 / 3.4 ≈ **\$295,000**.
-              - With a 2% worst window: need ~\$1,000,000 / 1.6 ≈ **\$625,000**.
-              That’s ~**2×** the lump sum—driven by just a few percent per year.
-
-            **Other reasons gaps appear:**
-            - **Worst window math:** 100% confidence uses the single roughest stretch in history.
-            - **Different eras:** If one dataset includes harsher early decades than the other, its worst window can be much lower.
-            - **Fees matter:** Even small annual costs compound.
-
-            **Tips to sanity‑check:**
-            - Try **95–99% confidence** to use a conservative percentile instead of the single worst case.
-            - If needed, we can add an **“overlapping years only”** toggle to compare apples-to-apples time ranges.
-            """
-        ))
+        )
     st.subheader("Results")
     # Determine which Allocation has the minimum required lump sum for each source
     global_alloc = None

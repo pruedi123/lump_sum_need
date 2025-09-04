@@ -2,7 +2,6 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 import os
-from textwrap import dedent
 
 # Try to import plotly with a clear, actionable error if missing
 try:
@@ -33,7 +32,7 @@ except Exception as e:
 
 st.set_page_config(layout="wide")
 st.title("Required Lump Sum by Allocation")
-st.caption("This Model Computes the one‑time contribution needed to reach your goal with the selected confidence using historical factor windows. This model assumes that the future goal is in 'Today's Dollars' which ajdusts for inflation.")
+st.caption("Computes the one‑time contribution needed to reach your goal with the selected confidence using historical factor windows. This model assumes that the future goal is in 'Today's Dollars' which ajdusts for inflation.")
 
 # ------------------------------
 # Inputs
@@ -45,7 +44,7 @@ col1, col2, col3 = st.columns(3)
 with col1:
     data_choice = st.selectbox(
         "Data source",
-        ["Global", "S&P 500", "Both (Global & SPX)"],
+        ["Global (LBM)", "S&P 500 (SPX)", "Both (LBM + SPX)"],
         index=0,
         help="Choose the factor set: LBM workbook (Excel), S&P 500 CSV (spx_factors.csv), or both.",
     )
@@ -53,7 +52,7 @@ with col1:
 with col2:
     num_years = st.number_input("Years", min_value=1, max_value=60, value=30)
 with col3:
-    conf_pct = st.slider("Confidence (%)", min_value=50, step=10,max_value=100, value=90)
+    conf_pct = st.slider("Confidence (%)", min_value=50, max_value=100, value=90)
     confidence_level = conf_pct / 100.0
     fee_pct = st.slider(
         "Annual fee (%)",
@@ -84,11 +83,13 @@ df_lbm, df_spx = None, None
 if src_kind in ("LBM", "BOTH"):
     try:
         df_lbm = pd.read_excel(file_path, sheet_name=sheet_name)
+        st.success("LBM worksheet loaded.")
     except Exception as e:
         st.error(f"Error loading LBM factors: {e}")
 if src_kind in ("SPX", "BOTH"):
     try:
         df_spx = pd.read_csv("spx_factors.csv")
+        st.success("SPX factors loaded.")
     except Exception as e:
         st.error(f"Error loading SPX factors: {e}")
 
@@ -205,6 +206,7 @@ if have_any:
                 req = required_lumpsum_for_goal(evs, float(goal), float(confidence_level))
                 note = ""
             rows.append({
+                "Source": "LBM",
                 "Allocation": col.strip(),
                 "Required Lump Sum": np.nan if pd.isna(req) else float(req),
             })
@@ -219,11 +221,14 @@ if have_any:
                 req = required_lumpsum_for_goal(evs, float(goal), float(confidence_level))
                 note = ""
             rows.append({
+                "Source": "SPX",
                 "Allocation": col.strip(),
                 "Required Lump Sum": np.nan if pd.isna(req) else float(req),
             })
 
     results = pd.DataFrame(rows)
+    # Preserve original worksheet header as Portfolio Name before mapping to pretty labels
+    results["Portfolio Name"] = results["Allocation"]
 
     # Order & pretty labels per source (or both)
     order_lbm = [
@@ -238,176 +243,63 @@ if have_any:
     order_spx = [f"spx{p}e" for p in [100,90,80,70,60,50,40,30,20,10,0]]
     pretty_spx = {f"spx{p}e": f"{p}% Equity" for p in [100,90,80,70,60,50,40,30,20,10,0]}
 
-    # Build 3‑column results: Allocation (generic), Global, SP500
-    def _to_generic_label(a: str) -> str:
-        # Map raw header to a generic label via the pretty maps
-        lab = pretty_lbm.get(a, pretty_spx.get(a, a))
-        # Normalize: treat any "0% Equity" as "100% Fixed" to align SPX 0e with LBM 100F
-        if isinstance(lab, str) and lab.strip().startswith("0% Equity"):
-            return "100% Fixed"
-        return lab
+    if src_kind == "LBM":
+        order = order_lbm
+        pretty = pretty_lbm
+    elif src_kind == "SPX":
+        order = order_spx
+        pretty = pretty_spx
+    else:  # BOTH
+        # Use only present columns to avoid category mismatches
+        present_lbm = [c for c in allocation_cols_lbm if c in results["Allocation"].unique()]
+        present_spx = [c for c in allocation_cols_spx if c in results["Allocation"].unique()]
+        order = present_lbm + present_spx
+        pretty_lbm_both = {k: pretty_lbm.get(k, k) + " (LBM)" for k in present_lbm}
+        pretty_spx_both = {k: pretty_spx.get(k, k) + " (SPX)" for k in present_spx}
+        pretty = {**pretty_lbm_both, **pretty_spx_both}
 
-    tmp = results.copy()
-    tmp["Allocation"] = tmp["Allocation"].astype(str)
+    results["_key"] = pd.Categorical(results["Allocation"], categories=order, ordered=True)
+    results = results.sort_values("_key").drop(columns=["_key"]).copy()
+    results["Allocation"] = results["Allocation"].map(pretty).fillna(results["Allocation"])  # fallback
 
-    # Derive source from the raw header prefix
-    tmp["Source"] = np.where(
-        tmp["Allocation"].str.upper().str.startswith("LBM "),
-        "Global",
-        np.where(tmp["Allocation"].str.lower().str.startswith("spx"), "SP500", None),
-    )
-    tmp["Generic"] = tmp["Allocation"].map(_to_generic_label)
+    # Prepare a copy for display with currency formatting
+    display_results = results.copy()
+    if "Required Lump Sum" in display_results.columns:
+        display_results["Required Lump Sum"] = display_results["Required Lump Sum"].apply(
+            lambda x: f"${x:,.0f}" if pd.notna(x) else ""
+        )
 
-    # Pivot to wide format with rows as generic allocation names
-    wide = tmp.pivot_table(index="Generic", columns="Source", values="Required Lump Sum", aggfunc="first")
+    # Reorder columns for display to include the original Portfolio Name
+    desired_cols = ["Source", "Allocation", "Portfolio Name", "Required Lump Sum"]
+    display_results = display_results[[c for c in desired_cols if c in display_results.columns]]
 
-    # Order rows by common allocation sequence
-    generic_order = [
-        "100% Equity","90% Equity","80% Equity","70% Equity","60% Equity",
-        "50% Equity","40% Equity","30% Equity","20% Equity","10% Equity","100% Fixed"
-    ]
-    present_generic = [g for g in generic_order if g in wide.index]
-    wide = wide.reindex(present_generic)
-
-    # Reset index
-    wide = wide.rename_axis(None, axis=1).reset_index().rename(columns={"Generic": "Allocation"})
-
-    # Currency formatting for display
-    display_results = wide.copy()
-    for col in ["Global", "SP500"]:
-        if col in display_results.columns:
-            display_results[col] = display_results[col].apply(lambda x: f"${x:,.0f}" if pd.notna(x) else "")
-
-    # Reorder columns dynamically based on selected data source
-    cols = ["Allocation"]
-    if "Global" in display_results.columns:
-        cols.append("Global")
-    if "SP500" in display_results.columns:
-        cols.append("SP500")
-    display_results = display_results[cols]
-
-    with st.expander("Why compare Global vs. S&P 500?"):
-        st.markdown(dedent(
-            """
-            **The simple story:** You’ll often hear “just buy the S&P 500.” It’s low-cost and has done well—especially recently.
-            But the S&P 500 is only U.S. large companies. A **global** portfolio owns thousands of companies across many countries and sectors.
-
-            **What this tool does:** It is an **historical audit**—not a prediction. For each allocation, it uses real, rolling periods
-            to answer: *“How much would I have needed to invest up front to reach my goal?”*  
-            Small annual return differences can compound into **big** gaps over 20–30 years, which this makes easy to see.
-
-            **How to read the results:**
-            - **Allocation**: The stock/bond mix (e.g., 60% Equity).
-            - **Global vs. SP500**: The up-front amount needed in each portfolio to target your goal based on historical windows.
-            - **Confidence**: 100% = worst historical window; 95% = still conservative but less extreme.
-            - **Fees**: You can include an annual fee to see the impact.
-
-            **Bottom line:** The S&P 500 has led lately, but leadership rotates. A **global** approach spreads your bets and has often delivered
-            competitive—or better—long-term outcomes without relying on a single country or sector.
-
-            *Educational use only. Past performance does not guarantee future results.*
-            """
-        ))
-    with st.expander("Why can the dollar difference be so large over long horizons?"):
-        st.markdown(dedent(
-            """
-            **Short answer:** compounding + using the **worst historical window** at 100% confidence.
-
-            - **Small annual gaps snowball.** A 3% per year difference over 25 years roughly doubles the ending value.
-            - **Required lump sum is inverse growth.** If Portfolio A grows ~2× more over the horizon, you need about **half** the up‑front amount.
-
-            **Quick example (illustrative):**
-            - Over 25 years, 5%/yr grows \$1 to about **\$3.4**; 2%/yr grows \$1 to about **\$1.6**.
-            - To reach a \$1,000,000 goal:
-              - With a 5% worst window: need ~\$1,000,000 / 3.4 ≈ **\$295,000**.
-              - With a 2% worst window: need ~\$1,000,000 / 1.6 ≈ **\$625,000**.
-              That’s ~**2×** the lump sum—driven by just a few percent per year.
-
-            **Other reasons gaps appear:**
-            - **Worst window math:** 100% confidence uses the single roughest stretch in history.
-            - **Different eras:** If one dataset includes harsher early decades than the other, its worst window can be much lower.
-            - **Fees matter:** Even small annual costs compound.
-
-            **Tips to sanity‑check:**
-            - Try **95–99% confidence** to use a conservative percentile instead of the single worst case.
-            - If needed, we can add an **“overlapping years only”** toggle to compare apples-to-apples time ranges.
-            """
-        ))
     st.subheader("Results")
-    # Determine which Allocation has the minimum required lump sum for each source
-    global_alloc = None
-    spx_alloc = None
-    if "Global" in wide.columns and wide["Global"].notna().any():
-      gidx = wide["Global"].idxmin()
-      global_alloc = wide.loc[gidx, "Allocation"]
-    if "SP500" in wide.columns and wide["SP500"].notna().any():
-      sidx = wide["SP500"].idxmin()
-      spx_alloc = wide.loc[sidx, "Allocation"]
+    st.write(display_results)
 
-    # Styling function to highlight minimum cells only
-    def _highlight_min_cells(df: pd.DataFrame) -> pd.DataFrame:
-      styles = pd.DataFrame("", index=df.index, columns=df.columns)
-      if global_alloc is not None and "Global" in df.columns:
-          styles.loc[df["Allocation"] == global_alloc, "Global"] = "background-color:#e6f7e6;font-weight:600;"
-      if spx_alloc is not None and "SP500" in df.columns:
-          styles.loc[df["Allocation"] == spx_alloc, "SP500"] = "background-color:#fff2e6;font-weight:600;"
-      return styles
-
-    styled = display_results.style.apply(_highlight_min_cells, axis=None)
-    st.dataframe(styled, use_container_width=True)
-
-
-    # Separate charts for Global and SP500, each with min highlight
-    chart_df = wide.copy()
-    if not chart_df.empty:
-        n = len(chart_df)
-
-        # ---- Global chart ----
-        if "Global" in chart_df.columns and chart_df["Global"].notna().any():
-            g_vals = chart_df["Global"]
-            g_colors = ["#9ecae1"] * n  # light blue base for Global
-            g_min_pos = g_vals[g_vals.notna()].idxmin()
-            try:
-                g_i = chart_df.index.get_loc(g_min_pos)
-            except Exception:
-                g_i = int(g_min_pos) if isinstance(g_min_pos, (int, np.integer)) else None
-            if g_i is not None and 0 <= g_i < n:
-                g_colors[g_i] = "#2ca02c"  # green highlight for lowest Global
-            fig_g = go.Figure()
-            fig_g.add_bar(name="Global", x=chart_df["Allocation"], y=g_vals, marker_color=g_colors)
-            fig_g.update_layout(
-                title="Required Lump Sum — Global",
-                xaxis_title="Allocation",
-                yaxis_title="Required Lump Sum ($)",
-                yaxis=dict(tickformat=",.0f", tickprefix="$"),
-                showlegend=False,
-            )
-            st.plotly_chart(fig_g, use_container_width=True)
-
-        # ---- SP500 chart ----
-        if "SP500" in chart_df.columns and chart_df["SP500"].notna().any():
-            s_vals = chart_df["SP500"]
-            s_colors = ["#3182bd"] * n  # darker blue base for SP500
-            s_min_pos = s_vals[s_vals.notna()].idxmin()
-            try:
-                s_i = chart_df.index.get_loc(s_min_pos)
-            except Exception:
-                s_i = int(s_min_pos) if isinstance(s_min_pos, (int, np.integer)) else None
-            if s_i is not None and 0 <= s_i < n:
-                s_colors[s_i] = "#D95F02"  # orange highlight for lowest SP500
-            fig_s = go.Figure()
-            fig_s.add_bar(name="SP500", x=chart_df["Allocation"], y=s_vals, marker_color=s_colors)
-            fig_s.update_layout(
-                title="Required Lump Sum — SP500",
-                xaxis_title="Allocation",
-                yaxis_title="Required Lump Sum ($)",
-                yaxis=dict(tickformat=",.0f", tickprefix="$"),
-                showlegend=False,
-            )
-            st.plotly_chart(fig_s, use_container_width=True)
+    # Bar chart
+    plot_df = results.dropna(subset=["Required Lump Sum"]).copy()
+    if not plot_df.empty:
+        min_val = plot_df["Required Lump Sum"].min()
+        colors = ["green" if v == min_val else "blue" for v in plot_df["Required Lump Sum"]]
+        fig = go.Figure(data=[go.Bar(
+            x=plot_df['Allocation'],
+            y=plot_df['Required Lump Sum'],
+            marker_color=colors,
+            text=[f"${v:,.0f}" for v in plot_df['Required Lump Sum']],
+            textposition='outside'
+        )])
+        fig.update_layout(
+            title="Required Lump Sum by Allocation",
+            xaxis_title="Allocation",
+            yaxis_title="Required Lump Sum ($)",
+            uniformtext_minsize=8,
+            uniformtext_mode='hide',
+            yaxis=dict(tickformat=",.0f", tickprefix="$")
+        )
+        st.plotly_chart(fig, use_container_width=True)
 
     # Download (CSV with raw numeric values)
-    csv = display_results.to_csv(index=False)
+    csv = results.to_csv(index=False)
     st.download_button("Download CSV", data=csv, file_name="required_lumpsum_by_allocation.csv", mime="text/csv")
 
     st.divider()

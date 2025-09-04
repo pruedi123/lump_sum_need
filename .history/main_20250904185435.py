@@ -317,10 +317,10 @@ if have_any:
             - **Required lump sum is inverse growth.** If Portfolio A grows ~2× more over the horizon, you need about **half** the up‑front amount.
 
             **Quick example (illustrative):**
-            - Over 25 years, 5%/yr grows \$1 to about **\$3.4**; 2%/yr grows \$1 to about **\$1.6**.
-            - To reach a \$1,000,000 goal:
-              - With a 5% worst window: need ~\$1,000,000 / 3.4 ≈ **\$295,000**.
-              - With a 2% worst window: need ~\$1,000,000 / 1.6 ≈ **\$625,000**.
+            - Over 25 years, 5%/yr grows $1 to about **$3.4**; 2%/yr grows $1 to about **$1.6**.
+            - To reach a $1,000,000 goal:
+              - With a 5% worst window: need ~$1,000,000 / 3.4 ≈ **$295,000**.
+              - With a 2% worst window: need ~$1,000,000 / 1.6 ≈ **$625,000**.
               That’s ~**2×** the lump sum—driven by just a few percent per year.
 
             **Other reasons gaps appear:**
