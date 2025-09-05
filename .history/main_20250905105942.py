@@ -93,7 +93,7 @@ with col1:
     goal = st.number_input(
         "Goal ($)",
         min_value=1,
-        step=50000,
+        step=1000,
         value=1_000_000,
         help=dedent(
             "“Today’s dollars” means the same buying power as money today (inflation‑adjusted). "
@@ -224,20 +224,24 @@ def simulate_ending_values_lumpsum(factors: pd.Series, years: int, step: int) ->
 
 
 def required_lumpsum_for_goal(ending_values: list, goal_amount: float, conf: float) -> float:
-    """Given the distribution of ending values for $1 lump sum invested,
-    compute the upfront amount needed to hit 'goal_amount' with the specified
-    confidence. Uses the lower‑tail (1 − conf) quantile conservatively.
+    """Given ending values for $1 invested, return the upfront amount needed
+    to hit 'goal_amount' with the specified confidence. We take the lower-tail
+    q = (1 - conf) quantile using linear interpolation to avoid collapsing to
+    the single worst outcome when the sample size is small.
     """
     if not ending_values:
         return float('nan')
-    arr = np.array(sorted(ending_values))
-    q = (1.0 - conf)
-    idx = int(np.floor(q * len(arr)))
-    idx = max(0, min(idx, len(arr) - 1))
-    ev = arr[idx]
-    if ev <= 0:
+    arr = np.sort(np.array(ending_values, dtype=float))
+    q = max(0.0, min(1.0, 1.0 - float(conf)))
+    try:
+        # Newer NumPy
+        ev = np.quantile(arr, q, method="linear")
+    except TypeError:
+        # Older NumPy
+        ev = np.quantile(arr, q, interpolation="linear")
+    if ev <= 0 or not np.isfinite(ev):
         return float('inf')
-    return goal_amount / ev
+    return float(goal_amount) / float(ev)
 
 # ------------------------------
 # Run
@@ -390,197 +394,70 @@ if have_any:
     st.dataframe(styled, use_container_width=True)
 
 
-    # ------------------------------------------------------------
-    # Failure Distribution panel (per source, for the CHEAPEST allocation)
-    # ------------------------------------------------------------
-    st.markdown("#### Failure Distribution (when investing the Required Lump Sum)")
-    failure_rows = []
-    
-    # Build maps from generic label -> raw column for each source
-    inv_lbm = {v: k for k, v in pretty_lbm.items()}    # e.g., "60% Equity" -> "LBM 60E"
-    inv_spx = {v: k for k, v in pretty_spx.items()}    # e.g., "60% Equity" -> "spx60e"
-    # Normalize: generic "100% Fixed" maps to LBM 100F and spx0e where applicable
-    if "100% Fixed" not in inv_lbm and "LBM 100F" in pretty_lbm:
-        inv_lbm["100% Fixed"] = "LBM 100F"
-    if "100% Fixed" not in inv_spx and "spx0e" in pretty_spx:
-        inv_spx["100% Fixed"] = "spx0e"
-    
-    # Helper to compute failure distribution for one source/allocation
-    def _failure_stats(df_src, raw_col, required_amt, label_source):
-        evs = simulate_ending_values_lumpsum(df_src[raw_col], int(num_years), int(row_increment))
-        if not evs:
-            return
-        arr = np.array(evs, dtype=float) * float(required_amt)  # ending values in currency when investing Required Lump Sum
-        total = int(arr.size)
-        fails = arr < float(goal)
-        num_fail = int(fails.sum())
-        if num_fail == 0:
-            failure_rows.append({
-                "Source": label_source,
-                "Allocation": raw_col,
-                "Windows": total,
-                "Failures": 0,
-                "Failure Rate": "0.0%",
-                "Worst": "",
-                "P25": "",
-                "Median": "",
-                "P75": ""
+    # Distribution of ending values across all rolling windows (per source)
+    def _collect_evs(df_src: pd.DataFrame, cols: list[str]) -> list[float]:
+        series = []
+        for c in cols:
+            evs = simulate_ending_values_lumpsum(df_src[c], int(num_years), int(row_increment))
+            if evs:
+                series.extend(evs)
+        return series
+
+    dist_rows = []
+    if src_kind in ("LBM", "BOTH") and df_lbm is not None and allocation_cols_lbm:
+        evs_g = _collect_evs(df_lbm, allocation_cols_lbm)
+        if evs_g:
+            arr = np.array(evs_g, dtype=float)
+            pct = lambda q: np.percentile(arr, q)
+            dist_rows.append({
+                "Source": "Global",
+                "Windows": int(arr.size),
+                "Min": pct(0) * float(goal),
+                "P5": pct(5) * float(goal),
+                "P10": pct(10) * float(goal),
+                "Median": pct(50) * float(goal),
+                "P90": pct(90) * float(goal),
+                "Max": pct(100) * float(goal),
             })
-            return
-        failed = arr[fails]
-        # Compute quartiles of the failures
-        p25 = np.percentile(failed, 25)
-        p50 = np.percentile(failed, 50)
-        p75 = np.percentile(failed, 75)
-        worst = failed.min()
-        failure_rows.append({
-            "Source": label_source,
-            "Allocation": raw_col,
-            "Windows": total,
-            "Failures": num_fail,
-            "Failure Rate": f"{(num_fail/total):.1%}",
-            "Worst": f"${worst:,.0f}",
-            "P25": f"${p25:,.0f}",
-            "Median": f"${p50:,.0f}",
-            "P75": f"${p75:,.0f}",
-        })
-    
-    # Identify cheapest (min required lump sum) allocation for each source and compute failures
-    # Global
-    if "Global" in wide.columns and wide["Global"].notna().any():
-        gidx = wide["Global"].idxmin()
-        generic_g = wide.loc[gidx, "Allocation"]
-        raw_g = inv_lbm.get(generic_g)
-        req_amt_g = wide.loc[gidx, "Global"]
-        if raw_g and (src_kind in ("LBM", "BOTH")) and df_lbm is not None:
-            _failure_stats(df_lbm, raw_g, req_amt_g, "Global")
-    # SP500
-    if "SP500" in wide.columns and wide["SP500"].notna().any():
-        sidx = wide["SP500"].idxmin()
-        generic_s = wide.loc[sidx, "Allocation"]
-        raw_s = inv_spx.get(generic_s)
-        req_amt_s = wide.loc[sidx, "SP500"]
-        if raw_s and (src_kind in ("SPX", "BOTH")) and df_spx is not None:
-            _failure_stats(df_spx, raw_s, req_amt_s, "SP500")
-    
-    if failure_rows:
-        fail_df = pd.DataFrame(failure_rows)
-        # Friendlier allocation label (generic instead of raw code) in output
-        def _friendly_alloc(raw_name, source):
-            if source == "Global":
-                return pretty_lbm.get(raw_name, raw_name)
-            else:
-                return pretty_spx.get(raw_name, raw_name)
-        fail_df["Allocation"] = fail_df.apply(lambda r: _friendly_alloc(r["Allocation"], r["Source"]), axis=1)
+    if src_kind in ("SPX", "BOTH") and df_spx is not None and allocation_cols_spx:
+        evs_s = _collect_evs(df_spx, allocation_cols_spx)
+        if evs_s:
+            arr = np.array(evs_s, dtype=float)
+            pct = lambda q: np.percentile(arr, q)
+            dist_rows.append({
+                "Source": "SP500",
+                "Windows": int(arr.size),
+                "Min": pct(0) * float(goal),
+                "P5": pct(5) * float(goal),
+                "P10": pct(10) * float(goal),
+                "Median": pct(50) * float(goal),
+                "P90": pct(90) * float(goal),
+                "Max": pct(100) * float(goal),
+            })
+
+    if dist_rows:
+        st.markdown("#### Distribution of Ending Values (based on historical rolling windows)")
+        dist_df = pd.DataFrame(dist_rows)
+        # Format currency columns
+        for c in ["Min", "P5", "P10", "Median", "P90", "Max"]:
+            if c in dist_df.columns:
+                dist_df[c] = dist_df[c].apply(lambda x: f"${x:,.0f}")
         st.data_editor(
-            fail_df,
+            dist_df,
             hide_index=True,
             disabled=True,
             use_container_width=True,
             column_config={
-                "Source": st.column_config.TextColumn("Source", help="Data source used."),
-                "Allocation": st.column_config.TextColumn("Allocation", help="Cheapest allocation at current settings."),
-                "Windows": st.column_config.NumberColumn("Windows", help="Number of valid rolling windows."),
-                "Failures": st.column_config.NumberColumn("Failures", help="Count of windows that ended below Goal."),
-                "Failure Rate": st.column_config.TextColumn("Failure Rate", help="Failures / Windows."),
-                "Worst": st.column_config.TextColumn("Worst", help="Worst ending value among failures."),
-                "P25": st.column_config.TextColumn("P25", help="25th percentile of failure endings."),
-                "Median": st.column_config.TextColumn("Median", help="Median failure ending value."),
-                "P75": st.column_config.TextColumn("P75", help="75th percentile (less-bad failure)."),
+                "Source": st.column_config.TextColumn("Source", help="Data source for the factors."),
+                "Windows": st.column_config.NumberColumn("Windows", help="Number of valid rolling windows used."),
+                "Min": st.column_config.TextColumn("Min", help="Worst historical ending value (currency)."),
+                "P5": st.column_config.TextColumn("P5", help="5th percentile of historical ending values."),
+                "P10": st.column_config.TextColumn("P10", help="10th percentile of historical ending values."),
+                "Median": st.column_config.TextColumn("Median", help="50th percentile (median)."),
+                "P90": st.column_config.TextColumn("P90", help="90th percentile of historical ending values."),
+                "Max": st.column_config.TextColumn("Max", help="Best historical ending value (currency)."),
             }
         )
-    else:
-        st.info("No failures at the selected confidence for the cheapest allocation(s).")
-
-
-    # ------------------------------------------------------------
-    # Success Distribution panel (per source, for the CHEAPEST allocation)
-    # ------------------------------------------------------------
-    st.markdown("#### Success Distribution (when investing the Required Lump Sum)")
-    success_rows = []
-
-    def _success_stats(df_src, raw_col, required_amt, label_source):
-        evs = simulate_ending_values_lumpsum(df_src[raw_col], int(num_years), int(row_increment))
-        if not evs:
-            return
-        arr = np.array(evs, dtype=float) * float(required_amt)  # ending values ($) when investing Required Lump Sum
-        total = int(arr.size)
-        succ_mask = arr >= float(goal)
-        num_succ = int(succ_mask.sum())
-        if num_succ == 0:
-            success_rows.append({
-                "Source": label_source,
-                "Allocation": raw_col,
-                "Windows": total,
-                "Successes": 0,
-                "Success Rate": "0.0%",
-                "P25": "",
-                "Median": "",
-                "P75": "",
-                "Best": ""
-            })
-            return
-        succ = arr[succ_mask]
-        p25 = np.percentile(succ, 25)
-        p50 = np.percentile(succ, 50)
-        p75 = np.percentile(succ, 75)
-        best = succ.max()
-        success_rows.append({
-            "Source": label_source,
-            "Allocation": raw_col,
-            "Windows": total,
-            "Successes": num_succ,
-            "Success Rate": f"{(num_succ/total):.1%}",
-            "P25": f"${p25:,.0f}",
-            "Median": f"${p50:,.0f}",
-            "P75": f"${p75:,.0f}",
-            "Best": f"${best:,.0f}",
-        })
-
-    # Compute success stats for the same cheapest allocations
-    if "Global" in wide.columns and wide["Global"].notna().any():
-        gidx = wide["Global"].idxmin()
-        generic_g = wide.loc[gidx, "Allocation"]
-        raw_g = inv_lbm.get(generic_g)
-        req_amt_g = wide.loc[gidx, "Global"]
-        if raw_g and (src_kind in ("LBM", "BOTH")) and df_lbm is not None:
-            _success_stats(df_lbm, raw_g, req_amt_g, "Global")
-    if "SP500" in wide.columns and wide["SP500"].notna().any():
-        sidx = wide["SP500"].idxmin()
-        generic_s = wide.loc[sidx, "Allocation"]
-        raw_s = inv_spx.get(generic_s)
-        req_amt_s = wide.loc[sidx, "SP500"]
-        if raw_s and (src_kind in ("SPX", "BOTH")) and df_spx is not None:
-            _success_stats(df_spx, raw_s, req_amt_s, "SP500")
-
-    if success_rows:
-        succ_df = pd.DataFrame(success_rows)
-        # Friendly allocation label
-        def _friendly_alloc2(raw_name, source):
-            if source == "Global":
-                return pretty_lbm.get(raw_name, raw_name)
-            else:
-                return pretty_spx.get(raw_name, raw_name)
-        succ_df["Allocation"] = succ_df.apply(lambda r: _friendly_alloc2(r["Allocation"], r["Source"]), axis=1)
-        st.data_editor(
-            succ_df,
-            hide_index=True,
-            disabled=True,
-            use_container_width=True,
-            column_config={
-                "Source": st.column_config.TextColumn("Source", help="Data source used."),
-                "Allocation": st.column_config.TextColumn("Allocation", help="Cheapest allocation at current settings."),
-                "Windows": st.column_config.NumberColumn("Windows", help="Number of valid rolling windows."),
-                "Successes": st.column_config.NumberColumn("Successes", help="Count of windows that ended at/above Goal."),
-                "Success Rate": st.column_config.TextColumn("Success Rate", help="Successes / Windows."),
-                "P25": st.column_config.TextColumn("P25", help="25th percentile of successful endings."),
-                "Median": st.column_config.TextColumn("Median", help="Median successful ending value."),
-                "P75": st.column_config.TextColumn("P75", help="75th percentile of successful endings."),
-                "Best": st.column_config.TextColumn("Best", help="Best ending value among successes."),
-            }
-        )
-    else:
-        st.info("No successes found (this would occur only at very high fees or extreme settings).")
 
 
     # Separate charts for Global and SP500, each with min highlight
