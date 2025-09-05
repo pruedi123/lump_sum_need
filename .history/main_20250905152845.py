@@ -91,7 +91,7 @@ with col1:
         help="Choose the returns set: Global, S&P 500 or both.",
     )
     essential_goal = st.number_input(
-        "Ideal Goal ($)",
+        "Essential Goal ($)",
         min_value=1,
         step=50000,
         value=1_000_000,
@@ -101,29 +101,30 @@ with col1:
         ),
         format="%i",
     )
-    conf_pct_essential = st.slider(
-        "Ideal Confidence (%)",
-        min_value=50, step=10, max_value=100, value=90,
-        help='e.g., 90% means size the lump sum so ≥90% of historical windows finish at/above the Ideal Goal.',
-    )
-    essential_confidence_level = conf_pct_essential / 100.0
 with col2:
     num_years = st.number_input("Years", min_value=1, max_value=60, value=30)
     floor_goal = st.number_input(
-        "Acceptable Goal ($)",
+        "Floor Goal ($)",
         min_value=1,
         step=50000,
         value=800_000,
         help="A minimum acceptable outcome (floor). The plan is sized so outcomes stay at/above this amount at the chosen floor confidence.",
         format="%i",
     )
+with col3:
+    conf_pct_essential = st.slider(
+        "Essential Confidence (%)",
+        min_value=50, step=10, max_value=100, value=90,
+        help='e.g., 90% means size the lump sum so ≥90% of historical windows finish at/above the Essential Goal.',
+    )
+    essential_confidence_level = conf_pct_essential / 100.0
+
     conf_pct_floor = st.slider(
-        "Acceptable Confidence (%)",
+        "Floor Confidence (%)",
         min_value=50, step=10, max_value=100, value=100,
-        help='Often set to 100%: size so all historical windows finish at/above the Acceptable Goal.',
+        help='Often set to 100%: size so all historical windows finish at/above the Floor Goal.',
     )
     floor_confidence_level = conf_pct_floor / 100.0
-with col3:
     fee_pct = st.slider(
         "Annual fee (%)",
         min_value=0.0,
@@ -532,7 +533,6 @@ if have_any:
                 "Windows": total,
                 "Successes": 0,
                 "Success Rate": "0.0%",
-                "Min": "",
                 "P25": "",
                 "Median": "",
                 "P75": "",
@@ -544,14 +544,12 @@ if have_any:
         p50 = np.percentile(succ, 50)
         p75 = np.percentile(succ, 75)
         best = succ.max()
-        min_succ = succ.min()
         success_rows.append({
             "Source": label_source,
             "Allocation": raw_col,
             "Windows": total,
             "Successes": num_succ,
             "Success Rate": f"{(num_succ/total):.1%}",
-            "Min": f"${min_succ:,.0f}",
             "P25": f"${p25:,.0f}",
             "Median": f"${p50:,.0f}",
             "P75": f"${p75:,.0f}",
@@ -594,7 +592,6 @@ if have_any:
                 "Windows": st.column_config.NumberColumn("Windows", help="Number of valid rolling windows."),
                 "Successes": st.column_config.NumberColumn("Successes", help="Count of windows that ended at/above Goal."),
                 "Success Rate": st.column_config.TextColumn("Success Rate", help="Successes / Windows."),
-                "Min": st.column_config.TextColumn("Min", help="Worst ending value among successes (still at/above Essential Goal)."),
                 "P25": st.column_config.TextColumn("P25", help="25th percentile of successful endings."),
                 "Median": st.column_config.TextColumn("Median", help="Median successful ending value."),
                 "P75": st.column_config.TextColumn("P75", help="75th percentile of successful endings."),

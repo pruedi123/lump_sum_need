@@ -101,29 +101,30 @@ with col1:
         ),
         format="%i",
     )
-    conf_pct_essential = st.slider(
-        "Ideal Confidence (%)",
-        min_value=50, step=10, max_value=100, value=90,
-        help='e.g., 90% means size the lump sum so ≥90% of historical windows finish at/above the Ideal Goal.',
-    )
-    essential_confidence_level = conf_pct_essential / 100.0
 with col2:
     num_years = st.number_input("Years", min_value=1, max_value=60, value=30)
     floor_goal = st.number_input(
-        "Acceptable Goal ($)",
+        "Floor Goal ($)",
         min_value=1,
         step=50000,
         value=800_000,
         help="A minimum acceptable outcome (floor). The plan is sized so outcomes stay at/above this amount at the chosen floor confidence.",
         format="%i",
     )
+with col3:
+    conf_pct_essential = st.slider(
+        "Essential Confidence (%)",
+        min_value=50, step=10, max_value=100, value=90,
+        help='e.g., 90% means size the lump sum so ≥90% of historical windows finish at/above the Essential Goal.',
+    )
+    essential_confidence_level = conf_pct_essential / 100.0
+
     conf_pct_floor = st.slider(
-        "Acceptable Confidence (%)",
+        "Floor Confidence (%)",
         min_value=50, step=10, max_value=100, value=100,
-        help='Often set to 100%: size so all historical windows finish at/above the Acceptable Goal.',
+        help='Often set to 100%: size so all historical windows finish at/above the Floor Goal.',
     )
     floor_confidence_level = conf_pct_floor / 100.0
-with col3:
     fee_pct = st.slider(
         "Annual fee (%)",
         min_value=0.0,
