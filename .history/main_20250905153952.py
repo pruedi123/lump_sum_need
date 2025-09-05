@@ -74,24 +74,6 @@ st.markdown(dedent("""
     <div class="muted" style="margin-top:6px;"><em>Educational use only. Past performance does not guarantee future results.</em></div>
   </div>
 </div>
-<div class="iris-tip" style="margin-left:20px;">
-  <span>🛈 <strong>Hover here to read Why I Built This Tool</strong></span>
-  <div class="iris-bubble">
-    <div class="iris-title">Why I Built This Tool</div>
-    <div class="muted">
-      When people think about investing, they often hear things like “stocks are risky” and “bonds are safe.” Or they hear that all you need is the S&amp;P 500 because it’s done so well recently. The truth is more complicated — and more interesting.
-    </div>
-    <ul>
-      <li>It shows how much you would need to invest <strong>today, in today’s dollars,</strong> to have a high probability of reaching a future goal.</li>
-      <li>It highlights the benefits of <strong>broad global diversification</strong> versus concentrating in just one market like U.S. large companies.</li>
-      <li>It helps you see that investing outcomes are not guarantees — they’re <strong>distributions with probabilities</strong>. You can choose the level of confidence you want and see what that means in dollar terms.</li>
-      <li>It also challenges some of the old labels. For long time frames, so‑called “risky” stocks can actually make it cheaper to reach your goals than “safe” bonds — and the differences in required lump sums are often dramatic.</li>
-    </ul>
-    <div class="muted" style="margin-top:6px;">
-      My hope is that this tool provides a helpful framework for thinking about your own financial goals. Not as a prediction, and not as advice — but as an <em>educational lens</em> into how markets, diversification, and time horizons shape the journey.
-    </div>
-  </div>
-</div>
 """), unsafe_allow_html=True)
 
 # ------------------------------
