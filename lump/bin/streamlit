@@ -1,5 +1,5 @@
 #!/bin/sh
-'''exec' "/Users/paulruedi/Desktop/web calcs/lump_sum_need/lump/bin/python3.11" "$0" "$@"
+'''exec' "/Users/paulruedi/Desktop/Updated Web Calcs/lump_sum_need/lump/bin/python3.13" "$0" "$@"
 ' '''
 import sys
 from streamlit.web.cli import main
