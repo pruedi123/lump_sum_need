@@ -99,7 +99,7 @@ st.markdown(dedent("""
 # ------------------------------
 # Inputs
 # ------------------------------
-file_path = "lbm_factors.xlsx"
+file_path = "global_factors.xlsx"
 sheet_name = "allocation_factors"
 
 col1, col2, col3 = st.columns(3)
@@ -157,7 +157,7 @@ row_increment = 12
 st.divider()
 
 # ------------------------------
-# Load factors (LBM Excel or SPX CSV)
+# Load factors (Global and SPX Excel files)
 # ------------------------------
 if data_choice.startswith("Both"):
     src_kind = "BOTH"
@@ -175,7 +175,7 @@ if src_kind in ("LBM", "BOTH"):
         st.error(f"Error loading LBM factors: {e}")
 if src_kind in ("SPX", "BOTH"):
     try:
-        df_spx = pd.read_csv("spx_factors.csv")
+        df_spx = pd.read_excel("spx_factors.xlsx")
     except Exception as e:
         st.error(f"Error loading SPX factors: {e}")
 
